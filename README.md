@@ -29,7 +29,7 @@ sudo apt-get install uv4l uv4l-raspicam uv4l-server uv4l-webrtc uv4l-raspicam-se
 reboot the PI.
 
 ### Configuration
-edit the file /uv4l/uv4l-raspicam.conf as follows (only relevant lines are reported)
+Edit the file /uv4l/uv4l-raspicam.conf as follows (only relevant lines are reported)
 ```bash
 video_nr = 0
 encoding = h264
@@ -43,6 +43,10 @@ server-option = --webrtc-receive-audio = no
 
 To remove the watermark from the video it is necessary to obtain a license from the project owner.
 The license should be placed in the configuration file
+
+### STUN server
+There are several STUN server open source implementation available.
+We succesfully tested and used (http://www.stunprotocol.org/)[Stuntman] on Windows.
 
 ### Usage
 On the RPI:
