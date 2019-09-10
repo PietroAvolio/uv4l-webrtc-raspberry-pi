@@ -41,9 +41,10 @@ server-option = --enable-webrtc-audio = no
 server-option = --webrtc-receive-audio = no
 ```
 
-
-### ---
-
+### Usage
+On the RPI:
 ```bash
 sudo uv4l --driver raspicam --driver-config-file /etc/uv4l/uv4l-raspicam.conf --video_nr 0 --scher-rr 0
 ```
+
+On the receive, download the webrtc-client.html from this folder
