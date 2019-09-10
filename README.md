@@ -41,6 +41,9 @@ server-option = --enable-webrtc-audio = no
 server-option = --webrtc-receive-audio = no
 ```
 
+To remove the watermark from the video it is necessary to obtain a license from the project owner.
+The license should be placed in the configuration file
+
 ### Usage
 On the RPI:
 ```bash
