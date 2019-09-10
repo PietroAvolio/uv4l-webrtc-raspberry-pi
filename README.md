@@ -46,7 +46,7 @@ The license should be placed in the configuration file
 
 ### STUN server
 There are several STUN server open source implementation available.
-We succesfully tested and used [Stuntma](http://www.stunprotocol.org/) on Windows.
+We succesfully tested and used [Stuntman](http://www.stunprotocol.org/) on Windows.
 
 ### Usage
 On the RPI:
