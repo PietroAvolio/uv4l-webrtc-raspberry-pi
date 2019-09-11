@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>UV4L WebRTC</title>
+		
+        <script type="text/javascript">
+			var INPUT_SIGNALING_SERVER, INPUT_STUN_SERVER;
+			
+			var MEDIA_CONSTRAINTS = {
+                optional: [],
+                mandatory: {
+                    OfferToReceiveAudio: false,
+                    OfferToReceiveVideo: true
+                }
+            };
+			
+            RTCPeerConnection = window.RTCPeerConnection || /*window.mozRTCPeerConnection ||*/ window.webkitRTCPeerConnection;
+            RTCSessionDescription = /*window.mozRTCSessionDescription ||*/ window.RTCSessionDescription;
+            RTCIceCandidate = /*window.mozRTCIceCandidate ||*/ window.RTCIceCandidate;
+			var signaling_web_socket;
+			var peer_connection;
+			var iceCandidates = [];
+				
+			function createPeerConnection() {
+                try {
+                    var pcConfig =  {"iceServers": [{"urls": ["stun:" + INPUT_STUN_SERVER]}]};
+                    var pcOptions = {};
+					
+                    peer_connection = new RTCPeerConnection(pcConfig, pcOptions);
+                    peer_connection.onicecandidate = onIceCandidate;
+					
+                    if ('ontrack' in peer_connection) {
+						console.log("OnTrack in peer_connection");
+                        peer_connection.ontrack = onTrack;
+                    } else {
+						console.log("OnTrack NOT in peer_connection");
+                        peer_connection.onaddstream = onRemoteStreamAdded; // deprecated
+                    }
+					
+                    peer_connection.onremovestream = onRemoteStreamRemoved;
+                    peer_connection.ondatachannel = onDataChannel;
+					
+                    console.log("Peer connection successfully created!");
+                } catch (e) {
+					console.error(e);
+                    console.error("createPeerConnection() failed");
+                }
+            }
+	
+			function onTrack(event) {
+                REMOTE_VIDEO_ELEMENT.srcObject = event.streams[0];
+            }
+	
+			function onRemoteStreamAdded(event) {
+                console.log("Remote stream added:", event.stream);
+                REMOTE_VIDEO_ELEMENT = event.stream;
+            }
+			
+			function onRemoteStreamRemoved(event) {
+                REMOTE_VIDEO_ELEMENT.srcObject = null;
+                REMOTE_VIDEO_ELEMENT.src = ''; // TODO: remove
+            }
+			
+			function onDataChannel(event) {
+                console.log("onDataChannel()");
+                datachannel = event.channel;
+
+                event.channel.onopen = function () {
+                    console.log("Data Channel is open!");
+                };
+
+                event.channel.onerror = function (error) {
+                    console.error("Data Channel Error:", error);
+                };
+
+                event.channel.onmessage = function (event) {
+                    console.log("Got Data Channel Message:", event.data);
+                };
+
+                event.channel.onclose = function () {
+                    datachannel = null;
+                    console.log("The Data Channel is Closed");
+                };
+            }
+	
+			function onIceCandidate(event) {
+                if (event.candidate) {
+                    var candidate = {
+                        sdpMLineIndex: event.candidate.sdpMLineIndex,
+                        sdpMid: event.candidate.sdpMid,
+                        candidate: event.candidate.candidate
+                    };
+                    var request = {
+                        what: "addIceCandidate",
+                        data: JSON.stringify(candidate)
+                    };
+                    signaling_web_socket.send(JSON.stringify(request));
+                } else {
+                    console.log("End of candidates.");
+                }
+            }
+			
+			function addIceCandidates() {
+                iceCandidates.forEach(function (candidate) {
+                    peer_connection.addIceCandidate(candidate,
+                        function () {
+                            console.log("IceCandidate added: " + JSON.stringify(candidate));
+                        },
+                        function (error) {
+                            console.error("addIceCandidate error: " + error);
+                        }
+                    );
+                });
+                iceCandidates = [];
+            }
+			
+			function start() {
+                if ("WebSocket" in window) {
+                    var protocol = location.protocol === "https:" ? "wss:" : "ws:";
+                    signaling_web_socket = new WebSocket(protocol + '//' + INPUT_SIGNALING_SERVER + '/stream/webrtc');
+
+                    function call(stream) {
+						console.log("call() invoked");
+						
+                        iceCandidates = [];
+                        remoteDesc = false;
+                        createPeerConnection();
+						
+						
+                        var request = {
+                            what: "call",
+                            options: {
+                                force_hw_vcodec: true,
+                                /*vformat: document.getElementById("remote_vformat").value,*/
+                                trickle_ice: true
+                            }
+                        };
+                        signaling_web_socket.send(JSON.stringify(request));
+                        console.log("call(), request=" + JSON.stringify(request));
+                    }
+
+                    signaling_web_socket.onopen = function () {
+                        console.log("Signaling web socket correctly opened");
+						call();
+                    };
+
+					signaling_web_socket.onmessage = function (evt) {
+                        var msg = JSON.parse(evt.data);
+                        if (msg.what !== 'undefined') {
+                            var what = msg.what;
+                            var data = msg.data;
+                        }
+                        console.log("message =" + what);
+
+                        switch (what) {
+                            case "offer":
+                                peer_connection.setRemoteDescription(new RTCSessionDescription(JSON.parse(data)),
+                                        function onRemoteSdpSuccess() {
+                                            remoteDesc = true;
+                                            addIceCandidates();
+                                            console.log('onRemoteSdpSucces()');
+                                            
+											peer_connection.createAnswer(function (sessionDescription) {
+												console.log(sessionDescription);
+                                                peer_connection.setLocalDescription(sessionDescription);
+                                                var request = {
+                                                    what: "answer",
+                                                    data: JSON.stringify(sessionDescription)
+                                                };
+                                                signaling_web_socket.send(JSON.stringify(request));
+
+                                            }, function (error) {
+                                                alert("Failed to createAnswer: " + error);
+
+                                            }, MEDIA_CONSTRAINTS);
+                                        },
+                                        function onRemoteSdpError(event) {
+                                            alert('Failed to set remote description (unsupported codec on this browser?): ' + event);
+                                            stop();
+                                        }
+                                );
+                                break;
+
+                            case "answer":
+                                break;
+
+                            case "message":
+                                alert("signaling web socket message:" + msg.data);
+                                break;
+
+                            case "iceCandidate": // when trickle is enabled
+                                if (!msg.data) {
+                                    console.log("Ice Gathering Complete");
+                                    break;
+                                }
+                                var elt = JSON.parse(msg.data);
+                                let candidate = new RTCIceCandidate({sdpMLineIndex: elt.sdpMLineIndex, candidate: elt.candidate});
+                                iceCandidates.push(candidate);
+                                if (remoteDesc)
+                                    addIceCandidates();
+                                break;
+
+                            case "iceCandidates": // when trickle ice is not enabled
+                                var candidates = JSON.parse(msg.data);
+                                for (var i = 0; candidates && i < candidates.length; i++) {
+                                    var elt = candidates[i];
+                                    let candidate = new RTCIceCandidate({sdpMLineIndex: elt.sdpMLineIndex, candidate: elt.candidate});
+                                    iceCandidates.push(candidate);
+                                }
+                                if (remoteDesc)
+                                    addIceCandidates();
+                                document.documentElement.style.cursor = 'default';
+                                break;
+                        }
+                    };
+					
+                } else {
+                    alert("Sorry, this browser does not support WebSockets.");
+                }
+            }
+        </script>
+        <style>
+            #connection-control{
+				width: 620px;
+				height: auto;
+				padding: 10px;
+				background-color: #eee;
+				border: 1px solid black;
+				margin: 0 auto 1em auto;
+			}
+			
+			#connection-control input{
+				margin-left: 2px;
+				margin-right: 7px;
+			}
+        </style>
+    </head>
+    <body>
+		<div id="connection-control">
+			<label for="signaling_server">Signaling server
+			<input name="signaling_server" id="signaling_server" placeholder="192.168.1.1:8080">
+			
+			<label for="stun_server">STUN server
+			<input name="stun_server" id="stun_server" placeholder="192.168.1.1:3478">
+			
+			<input type="submit" value="Connect" name="webrtc_connect" id="webrtc_connect">
+		</div>
+	
+		<div style="text-align: center;">
+			<video id="remote-video" autoplay="" controls="" style="margin: 0 auto; width: 400px;">
+				Your browser does not support the video tag.
+			</video>
+		</div>
+    </body>
+	
+	<script type="text/javascript">
+		var REMOTE_VIDEO_ELEMENT = document.getElementById('remote-video');
+		
+		document.getElementById("webrtc_connect").onclick = function () { 
+			INPUT_SIGNALING_SERVER = document.getElementById("signaling_server").value
+			INPUT_STUN_SERVER = document.getElementById("stun_server").value
+			start()
+		};
+	</script>
+</html>
