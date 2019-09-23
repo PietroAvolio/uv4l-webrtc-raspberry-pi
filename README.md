@@ -36,6 +36,7 @@ encoding = h264
 width = 1640
 height = 922
 framerate = 40
+profile = baseline
 custom-sensor-config = 5
 server-option = --enable-webrtc-audio = no
 server-option = --webrtc-receive-audio = no
