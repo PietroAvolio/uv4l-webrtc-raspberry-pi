@@ -29,7 +29,7 @@ sudo apt-get install uv4l uv4l-raspicam uv4l-server uv4l-webrtc uv4l-raspicam-se
 reboot the PI.
 
 ### Configuration
-Edit the file /uv4l/uv4l-raspicam.conf as follows (only relevant lines are reported)
+Edit the file /etc/uv4l/uv4l-raspicam.conf as follows (only relevant lines are reported)
 ```bash
 video_nr = 0
 encoding = h264
