@@ -54,7 +54,7 @@ On the RPI:
 ```bash
 sudo rm /dev/vide0
 sudo pkill uv4l
-sudo uv4l --driver raspicam --driver-config-file /etc/uv4l/uv4l-raspicam.conf --video_nr 0 --scher-rr 0
+sudo uv4l --driver raspicam --driver-config-file /etc/uv4l/uv4l-raspicam.conf --video_nr 0 --sched-rr 0
 ```
 
 to kill the process
