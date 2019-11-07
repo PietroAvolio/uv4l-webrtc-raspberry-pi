@@ -61,7 +61,7 @@ to kill the process
 
 ```bash
 sudo pkill uv4l
-sudo rm /dev/vide0
+sudo rm /dev/video0
 ```
 
 On the receive, download the webrtc-client.html from this folder
